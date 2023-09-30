@@ -21,6 +21,7 @@ dependencies:
   flutter_baidu_mapapi_base: ^3.4.1
   google_mobile_ads: ^3.0.0
   permission_handler: ^11.0.0
+  shared_preferences: ^2.2.1
 
 dev_dependencies:
   flutter_test:

@@ -4,9 +4,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:weather_app/weather_data.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import 'main.dart';
+import './util.dart';
+import './weather_data.dart';
 
 class WeatherPage extends StatefulWidget {
   const WeatherPage({super.key});
@@ -16,17 +17,21 @@ class WeatherPage extends StatefulWidget {
 }
 
 class WeatherPageState extends State<WeatherPage> {
-  late Future<WeatherData> _weatherDataFuture;
   BannerAd? _bannerAd;
 
   final String _adUnitId =
       Platform.isAndroid ? 'ca-app-pub-9275143816186195/7092152699' : '';
 
+  double longitude = 0.0;
+  double latitude = 0.0;
+  String address = '';
+  String pois = '';
+
   @override
   void initState() {
     super.initState();
+    loadData();
     _loadBannerAd();
-    _weatherDataFuture = _fetchWeatherData();
   }
 
   void _loadBannerAd() async {
@@ -56,11 +61,14 @@ class WeatherPageState extends State<WeatherPage> {
     super.dispose();
   }
 
-  Future<WeatherData> _fetchWeatherData() async {
+  Future<WeatherData> _fetchWeatherData({
+    required double longitude,
+    required double latitude,
+  }) async {
     try {
       Dio dio = Dio();
       final Map<String, dynamic> queryParams = {
-        'location': '118.149635,33.783051',
+        'location': '$longitude,$latitude',
         'key': 'a008fc18ddda40558ce9df9f3a14508e',
         'lang': 'zh',
         'unit': 'm',
@@ -109,11 +117,60 @@ class WeatherPageState extends State<WeatherPage> {
     );
   }
 
+  // 存储数据
+  void saveData(
+    double longitude,
+    double latitude,
+    String address,
+    String pois,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('longitude', longitude);
+    await prefs.setDouble('latitude', latitude);
+    await prefs.setString('address', address);
+    await prefs.setString('pois', pois);
+  }
+
+  // 检索数据
+  Future<Map<String, dynamic>> loadData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final loadedLongitude = prefs.getDouble('longitude') ?? 0.0;
+    final loadedLatitude = prefs.getDouble('latitude') ?? 0.0;
+    final loadedAddress = prefs.getString('address') ?? '';
+    final loadedPois = prefs.getString('pois') ?? '';
+
+    // 更新类成员变量
+    setState(() {
+      longitude = loadedLongitude;
+      latitude = loadedLatitude;
+      address = loadedAddress;
+      pois = loadedPois;
+    });
+
+    return {
+      'longitude': loadedLongitude,
+      'latitude': loadedLatitude,
+      'address': loadedAddress,
+      'pois': loadedPois,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
+    final Object? args = ModalRoute.of(context)?.settings.arguments;
+
+    if (args is Map) {
+      longitude = args['longitude'];
+      latitude = args['latitude'];
+      address = args['address'];
+      pois = args['pois'];
+      // 存储数据到SharedPreferences
+      saveData(longitude, latitude, address, pois);
+    }
+
     return Scaffold(
       body: FutureBuilder<WeatherData>(
-        future: _weatherDataFuture,
+        future: _fetchWeatherData(longitude: longitude, latitude: latitude),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
@@ -128,18 +185,20 @@ class WeatherPageState extends State<WeatherPage> {
             return Scaffold(
               appBar: AppBar(
                 centerTitle: true,
-                title: const Column(
+                title: Column(
                   children: [
-                    Text('陈宝庄'),
+                    Text(pois),
                     Text(
-                      '中国江苏省徐州市睢宁县凌城镇孙薛村',
-                      style: TextStyle(fontSize: 12.0),
+                      address,
+                      style: const TextStyle(fontSize: 12.0),
                     ),
                   ],
                 ),
                 leading: IconButton(
                   onPressed: () {
-                    Navigator.pushNamed(context, '/city_location_page');
+                    Navigator.of(context).pushReplacementNamed(
+                      '/city_location_page',
+                    );
                   },
                   icon: const Icon(CupertinoIcons.add),
                 ),
@@ -178,7 +237,6 @@ class WeatherPageState extends State<WeatherPage> {
               ),
             );
           } else {
-            // 在连接状态为 done 但没有数据时显示一个默认视图
             return const Center(
               child: Text('没有数据'),
             );
