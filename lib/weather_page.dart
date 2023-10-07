@@ -3,7 +3,11 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart'
+    show BMFMapSDK;
+import 'package:flutter_bmflocation/flutter_bmflocation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import './util.dart';
@@ -27,11 +31,29 @@ class WeatherPageState extends State<WeatherPage> {
   String address = '';
   String pois = '';
 
+  BaiduLocation _locationResult = BaiduLocation();
+  final LocationFlutterPlugin _locPlugin = LocationFlutterPlugin();
+
   @override
   void initState() {
     super.initState();
     loadData();
     _loadBannerAd();
+    requestPermission();
+    _locPlugin.setAgreePrivacy(true);
+    BMFMapSDK.setAgreePrivacy(true);
+    // 接受定位回调
+    _locPlugin.seriesLocationCallback(callback: (BaiduLocation result) {
+      setState(() {
+        _locationResult = result;
+        logger.i('经纬度：${result.longitude},${result.latitude}');
+        if (result.latitude != null || result.longitude != null) {
+          _stopLocation();
+        } else {
+          _startLocation();
+        }
+      });
+    });
   }
 
   void _loadBannerAd() async {
@@ -67,6 +89,7 @@ class WeatherPageState extends State<WeatherPage> {
   }) async {
     try {
       Dio dio = Dio();
+
       final Map<String, dynamic> queryParams = {
         'location': '$longitude,$latitude',
         'key': 'a008fc18ddda40558ce9df9f3a14508e',
@@ -89,7 +112,8 @@ class WeatherPageState extends State<WeatherPage> {
     } catch (e, stackTrace) {
       logger.e('请求发生异常: $e', error: e, stackTrace: stackTrace);
     }
-    // 如果出现错误或异常，返回一个默认的 WeatherData 对象，或者根据您的需求返回适当的默认值
+
+    // 如果出现错误或异常，返回一个默认的 WeatherData 对象
     return WeatherData(
       code: '',
       updateTime: '',
@@ -124,7 +148,7 @@ class WeatherPageState extends State<WeatherPage> {
     String address,
     String pois,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('longitude', longitude);
     await prefs.setDouble('latitude', latitude);
     await prefs.setString('address', address);
@@ -133,7 +157,7 @@ class WeatherPageState extends State<WeatherPage> {
 
   // 检索数据
   Future<Map<String, dynamic>> loadData() async {
-    final prefs = await SharedPreferences.getInstance();
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
     final loadedLongitude = prefs.getDouble('longitude') ?? 0.0;
     final loadedLatitude = prefs.getDouble('latitude') ?? 0.0;
     final loadedAddress = prefs.getString('address') ?? '';
@@ -204,7 +228,27 @@ class WeatherPageState extends State<WeatherPage> {
                 ),
                 actions: [
                   IconButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      _locationAction();
+                      _startLocation();
+                      setState(() {
+                        longitude = _locationResult.longitude!;
+                        latitude = _locationResult.latitude!;
+                        address = _locationResult.address!;
+                        pois = _locationResult.pois![1].name!;
+
+                        saveData(longitude, latitude, address, pois);
+
+                        _fetchWeatherData(
+                          longitude: longitude,
+                          latitude: latitude,
+                        ).then(
+                          (value) => {
+                            _stopLocation(),
+                          },
+                        );
+                      });
+                    },
                     icon: const Icon(CupertinoIcons.location_solid),
                   )
                 ],
@@ -226,10 +270,19 @@ class WeatherPageState extends State<WeatherPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
+                        Text('更新时间：${weatherData.updateTime}'),
+                        Text('观测时间：${weatherData.now.obsTime}'),
                         Text('天气：${weatherData.now.text}'),
                         Text('温度：${weatherData.now.temp}°C'),
+                        Text('体感：${weatherData.now.feelsLike}°C'),
                         Text('湿度：${weatherData.now.humidity}%'),
                         Text('风力：${weatherData.now.windScale}级'),
+                        Text('云量：${weatherData.now.cloud}'),
+                        Text('风向360°：${weatherData.now.wind360}'),
+                        Text('露点温度：${weatherData.now.dew}'),
+                        Text('当前小时累计降水量：${weatherData.now.precip}mm'),
+                        Text('大气压强：${weatherData.now.pressure}百帕'),
+                        Text('风向：${weatherData.now.windDir}')
                       ],
                     ),
                   ),
@@ -244,5 +297,78 @@ class WeatherPageState extends State<WeatherPage> {
         },
       ),
     );
+  }
+
+  // 启动定位
+  Future<void> _startLocation() async {
+    await _locPlugin.startLocation();
+  }
+
+  // 设置android端和ios端定位参数
+  void _locationAction() async {
+    Map iosMap = _initIOSOptions().getMap();
+    Map androidMap = _initAndroidOptions().getMap();
+    await _locPlugin.prepareLoc(androidMap, iosMap);
+  }
+
+  // 设置地图参数
+  BaiduLocationAndroidOption _initAndroidOptions() {
+    BaiduLocationAndroidOption options = BaiduLocationAndroidOption(
+      coorType: 'bd09ll',
+      locationMode: BMFLocationMode.hightAccuracy,
+      isNeedAddress: true,
+      isNeedAltitude: true,
+      isNeedLocationPoiList: true,
+      isNeedNewVersionRgc: true,
+      isNeedLocationDescribe: true,
+      openGps: true,
+      scanspan: 4000,
+      coordType: BMFLocationCoordType.bd09ll,
+    );
+    return options;
+  }
+
+  BaiduLocationIOSOption _initIOSOptions() {
+    BaiduLocationIOSOption options = BaiduLocationIOSOption(
+      coordType: BMFLocationCoordType.bd09ll,
+      BMKLocationCoordinateType: 'BMKLocationCoordinateTypeBMK09LL',
+      desiredAccuracy: BMFDesiredAccuracy.best,
+      allowsBackgroundLocationUpdates: true,
+      pausesLocationUpdatesAutomatically: false,
+    );
+    return options;
+  }
+
+  // 停止定位
+  void _stopLocation() async {
+    await _locPlugin.stopLocation();
+    logger.i('停止连续定位');
+  }
+}
+
+// 动态申请定位权限
+void requestPermission() async {
+  // 申请权限
+  bool hasLocationPermission = await requestLocationPermission();
+  if (hasLocationPermission) {
+    // 权限申请通过
+  } else {}
+}
+
+// 申请定位权限 授予定位权限返回true， 否则返回false
+Future<bool> requestLocationPermission() async {
+  //获取当前的权限
+  var status = await Permission.location.status;
+  if (status == PermissionStatus.granted) {
+    //已经授权
+    return true;
+  } else {
+    //未授权则发起一次申请
+    status = await Permission.location.request();
+    if (status == PermissionStatus.granted) {
+      return true;
+    } else {
+      return false;
+    }
   }
 }
