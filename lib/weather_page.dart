@@ -11,7 +11,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import './util.dart';
-import './weather_data.dart';
+import 'model/weather_data.dart';
 
 class WeatherPage extends StatefulWidget {
   const WeatherPage({super.key});
@@ -47,11 +47,7 @@ class WeatherPageState extends State<WeatherPage> {
       setState(() {
         _locationResult = result;
         logger.i('经纬度：${result.longitude},${result.latitude}');
-        if (result.latitude != null || result.longitude != null) {
-          _stopLocation();
-        } else {
-          _startLocation();
-        }
+        _startLocation();
       });
     });
   }
@@ -184,10 +180,11 @@ class WeatherPageState extends State<WeatherPage> {
     final Object? args = ModalRoute.of(context)?.settings.arguments;
 
     if (args is Map) {
-      longitude = args['longitude'];
-      latitude = args['latitude'];
-      address = args['address'];
-      pois = args['pois'];
+      longitude = args['longitude'] ?? 0.0;
+      latitude = args['latitude'] ?? 0.0;
+      address = args['address'] ?? '';
+      pois = args['pois'] ?? '';
+
       // 存储数据到SharedPreferences
       saveData(longitude, latitude, address, pois);
     }
@@ -219,38 +216,39 @@ class WeatherPageState extends State<WeatherPage> {
                   ],
                 ),
                 leading: IconButton(
+                  icon: const Icon(CupertinoIcons.add),
                   onPressed: () {
                     Navigator.of(context).pushReplacementNamed(
                       '/city_location_page',
                     );
                   },
-                  icon: const Icon(CupertinoIcons.add),
                 ),
                 actions: [
                   IconButton(
-                    onPressed: () {
+                    icon: const Icon(CupertinoIcons.location_solid),
+                    onPressed: () async {
                       _locationAction();
-                      _startLocation();
+                      await _startLocation();
+
                       setState(() {
-                        longitude = _locationResult.longitude!;
-                        latitude = _locationResult.latitude!;
-                        address = _locationResult.address!;
-                        pois = _locationResult.pois![1].name!;
+                        longitude = _locationResult.longitude ?? 0.0;
+                        latitude = _locationResult.latitude ?? 0.0;
+                        address = _locationResult.address ?? '正在定位...';
+                        pois = _locationResult.pois?[1].name ?? '请重试...';
+
+                        if (longitude != 0.0 && latitude != 0.0) {
+                          _fetchWeatherData(
+                            longitude: longitude,
+                            latitude: latitude,
+                          ).then((value) => {_stopLocation()});
+
+                          _stopLocation();
+                        }
 
                         saveData(longitude, latitude, address, pois);
-
-                        _fetchWeatherData(
-                          longitude: longitude,
-                          latitude: latitude,
-                        ).then(
-                          (value) => {
-                            _stopLocation(),
-                          },
-                        );
                       });
                     },
-                    icon: const Icon(CupertinoIcons.location_solid),
-                  )
+                  ),
                 ],
               ),
               body: Stack(

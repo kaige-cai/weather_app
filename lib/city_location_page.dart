@@ -1,10 +1,13 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart'
     show BMFMapSDK;
 import 'package:flutter_bmflocation/flutter_bmflocation.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:weather_app/model/location_data.dart';
 import 'package:weather_app/util.dart';
 
+import 'data.dart';
 import 'first_time_checker.dart';
 
 class CityLocationPage extends StatefulWidget {
@@ -20,6 +23,10 @@ class _CityLocationPageState extends State<CityLocationPage> {
 
   bool _locationDataLoaded = false; // 是否已加载定位数据
   bool _isLoading = false;
+
+  final TextEditingController _textEditingController = TextEditingController();
+
+  bool _isVisible = false; // 控制清空按钮的可见性
 
   @override
   void initState() {
@@ -37,67 +44,228 @@ class _CityLocationPageState extends State<CityLocationPage> {
         }
       });
     });
+    _textEditingController.addListener(_onTextChanged);
     super.initState();
+  }
+
+  void _onTextChanged() {
+    setState(() {
+      _isVisible = _textEditingController.text.isNotEmpty;
+    });
   }
 
   @override
   void dispose() {
     _stopLocation();
+    _textEditingController.dispose();
     super.dispose();
+  }
+
+  Future<LocationData> _fetchLocationData({required String? area}) async {
+    try {
+      Dio dio = Dio();
+
+      final Map<String, dynamic> queryParams = {
+        'location': area,
+        'key': 'a008fc18ddda40558ce9df9f3a14508e',
+        'lang': 'zh',
+        'unit': 'm',
+      };
+
+      Response response = await dio.get(
+        'https://geoapi.qweather.com/v2/city/lookup',
+        queryParameters: queryParams,
+      );
+
+      if (response.statusCode == 200) {
+        Map<String, dynamic> data = response.data;
+        LocationData locationData = LocationData.fromJson(data);
+        return locationData;
+      } else {
+        logger.e('请求失败：${response.statusCode}');
+      }
+    } catch (e, stackTrace) {
+      logger.e('请求发生异常: $e', error: e, stackTrace: stackTrace);
+    }
+
+    // 如果出现错误或异常，返回一个默认的 LocationData 对象
+    return LocationData(
+      code: '',
+      location: [],
+      refer: Refer(
+        sources: [],
+        license: [],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(),
-      body: ListView(
-        children: [
-          TextButton(
-            onPressed: () async {
-              final navigator = Navigator.of(context);
-              _locationAction();
-              _startLocation();
-
-              setState(() {
-                _isLoading = true;
-              });
-
-              // 使用Future来模拟等待数据加载
-              // 等待数据加载完毕
-              while (!_locationDataLoaded) {
-                await Future.delayed(const Duration(milliseconds: 100));
-              }
-
-              // 数据加载完毕
-              setState(() {
-                _isLoading = false;
-              });
-
-              await FirstTimeChecker.setNotFirstTime();
-
-              navigator.pushReplacementNamed(
-                '/weather_page',
-                arguments: {
-                  'longitude': _locationResult.longitude,
-                  'latitude': _locationResult.latitude,
-                  'address': _locationResult.address,
-                  'pois': _locationResult.pois?[1].name
-                },
-              );
-            },
-            child: const Text('点击开始定位所在城市或区域'),
+      appBar: AppBar(
+        elevation: 0.0,
+        automaticallyImplyLeading: false,
+        title: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20.0),
           ),
-          // 根据 _isLoading 显示进度圈或经纬度信息
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : Center(
-                  child: Text(
-                    '${_locationResult.longitude ?? ''} '
-                    '${_locationResult.latitude ?? ''}',
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _textEditingController,
+                  decoration: const InputDecoration(
+                    hintText: "搜索全球城市及地区...",
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16.0),
+                    border: InputBorder.none,
                   ),
                 ),
-        ],
+              ),
+              Visibility(
+                visible: _isVisible, // 控制可见性
+                child: IconButton(
+                  color: Colors.blueAccent,
+                  onPressed: () {
+                    _textEditingController.clear(); // 清空文本字段
+                  },
+                  icon: const Icon(
+                    Icons.clear,
+                    size: 18.0,
+                  ),
+                ),
+              ),
+              IconButton(
+                color: Colors.blueAccent,
+                onPressed: () {},
+                icon: const Icon(Icons.search),
+              ),
+            ],
+          ),
+        ),
       ),
+      body: _isVisible
+          ? FutureBuilder<LocationData>(
+              future: _fetchLocationData(area: _textEditingController.text),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return Text('发生错误: ${snapshot.error}');
+                }
+
+                if (!snapshot.hasData) {
+                  return const Text('没有数据可用');
+                }
+
+                LocationData? data = snapshot.data;
+
+                return ListView.builder(
+                  itemCount: data?.location.length ?? 0,
+                  itemBuilder: (context, index) {
+                    if (index >= 0 && index < data!.location.length) {
+                      return GestureDetector(
+                        onTap: () {
+                          Location location = data.location[index];
+                          double longitude = double.parse(location.lon);
+                          double latitude = double.parse(location.lat);
+                          String address = '${location.country}'
+                              '${location.adm1}'
+                              '${location.adm2}';
+
+                          Navigator.of(context).pushReplacementNamed(
+                            '/weather_page',
+                            arguments: {
+                              'longitude': longitude,
+                              'latitude': latitude,
+                              'address': address,
+                              'pois': location.name
+                            },
+                          );
+                        },
+                        child: Center(
+                          child: Card(
+                            elevation: 4.0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16.0),
+                            ),
+                            child: Container(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Text(
+                                data.location[index].name,
+                                style: const TextStyle(fontSize: 18.0),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                    return const Center(child: Text('无效的索引'));
+                  },
+                );
+              },
+            )
+          : SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                children: [
+                  TextButton(
+                    onPressed: () async {
+                      final navigator = Navigator.of(context);
+                      _locationAction();
+                      _startLocation();
+
+                      setState(() {
+                        _isLoading = true;
+                      });
+
+                      // 使用Future来模拟等待数据加载
+                      // 等待数据加载完毕
+                      while (!_locationDataLoaded) {
+                        await Future.delayed(const Duration(milliseconds: 100));
+                      }
+
+                      // 数据加载完毕
+                      setState(() {
+                        _isLoading = false;
+                      });
+
+                      await FirstTimeChecker.setNotFirstTime();
+
+                      navigator.pushReplacementNamed(
+                        '/weather_page',
+                        arguments: {
+                          'longitude': _locationResult.longitude,
+                          'latitude': _locationResult.latitude,
+                          'address': _locationResult.address,
+                          'pois': _locationResult.pois?[1].name
+                        },
+                      );
+                    },
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.location_on_rounded),
+                        Text('点击定位所在城市或区域'),
+                      ],
+                    ),
+                  ),
+                  // 根据 _isLoading 显示进度圈或经纬度信息
+                  _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : Center(
+                          child: Text(
+                            '${_locationResult.longitude ?? ''} '
+                            '${_locationResult.latitude ?? ''}',
+                          ),
+                        ),
+                  CityCard(title: '热门城市', data: cities),
+                  CityCard(title: '国际城市', data: globalCities),
+                ],
+              ),
+            ),
     );
   }
 
@@ -172,5 +340,123 @@ Future<bool> requestLocationPermission() async {
     } else {
       return false;
     }
+  }
+}
+
+class CityCard extends StatelessWidget {
+  final List<String> data;
+  final String title;
+
+  const CityCard({super.key, required this.title, required this.data});
+
+  Future<LocationData> _fetchLocationData({required int index}) async {
+    try {
+      Dio dio = Dio();
+
+      final Map<String, dynamic> queryParams = {
+        'location': data[index],
+        'key': 'a008fc18ddda40558ce9df9f3a14508e',
+        'lang': 'zh',
+        'unit': 'm',
+      };
+
+      Response response = await dio.get(
+        'https://geoapi.qweather.com/v2/city/lookup',
+        queryParameters: queryParams,
+      );
+
+      if (response.statusCode == 200) {
+        Map<String, dynamic> data = response.data;
+        LocationData locationData = LocationData.fromJson(data);
+        return locationData;
+      } else {
+        logger.e('请求失败：${response.statusCode}');
+      }
+    } catch (e, stackTrace) {
+      logger.e('请求发生异常: $e', error: e, stackTrace: stackTrace);
+    }
+
+    // 如果出现错误或异常，返回一个默认的 LocationData 对象
+    return LocationData(
+      code: '',
+      location: [],
+      refer: Refer(
+        sources: [],
+        license: [],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10.0),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const BouncingScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              crossAxisSpacing: 8.0,
+              mainAxisSpacing: 4.0,
+              childAspectRatio: 2 / 1,
+            ),
+            itemCount: data.length,
+            itemBuilder: (BuildContext context, int index) {
+              return GestureDetector(
+                onTap: () async {
+                  double longitude = 0.0;
+                  double latitude = 0.0;
+                  String address = '';
+
+                  final navigator = Navigator.of(context);
+
+                  await _fetchLocationData(index: index).then(
+                    (LocationData value) => {
+                      longitude = double.parse(value.location[0].lon),
+                      latitude = double.parse(value.location[0].lat),
+                      address = '${value.location[0].country}'
+                          '${value.location[0].adm1}'
+                          '${value.location[0].adm2}'
+                    },
+                  );
+
+                  navigator.pushReplacementNamed(
+                    '/weather_page',
+                    arguments: {
+                      'longitude': longitude,
+                      'latitude': latitude,
+                      'address': address,
+                      'pois': data[index]
+                    },
+                  );
+                },
+                child: Card(
+                  elevation: 4.0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16.0),
+                  ),
+                  child: Center(
+                    child: Text(data[index]),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
   }
 }
