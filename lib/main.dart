@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:weather_app/city_location_page.dart';
 import 'package:weather_app/weather_page.dart';
 
@@ -12,7 +13,9 @@ void main() async {
 
   final isFirstTime = await FirstTimeChecker.isFirstTime();
 
-  runApp(WeatherApp(isFirstTime: isFirstTime));
+  initializeDateFormatting('zh_CN', null).then((_) {
+    runApp(WeatherApp(isFirstTime: isFirstTime));
+  });
 }
 
 class WeatherApp extends StatelessWidget {

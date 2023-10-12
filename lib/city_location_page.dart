@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart'
-    show BMFMapSDK;
+import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart' show BMFMapSDK;
 import 'package:flutter_bmflocation/flutter_bmflocation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:weather_app/model/location_data.dart';
@@ -79,8 +78,12 @@ class _CityLocationPageState extends State<CityLocationPage> {
 
       if (response.statusCode == 200) {
         Map<String, dynamic> data = response.data;
-        LocationData locationData = LocationData.fromJson(data);
-        return locationData;
+        if (data['code'] != '200') {
+          data['location'] = [];
+        } else {
+          LocationData locationData = LocationData.fromJson(data);
+          return locationData;
+        }
       } else {
         logger.e('请求失败：${response.statusCode}');
       }
@@ -156,8 +159,12 @@ class _CityLocationPageState extends State<CityLocationPage> {
                   return Text('发生错误: ${snapshot.error}');
                 }
 
-                if (!snapshot.hasData) {
-                  return const Text('没有数据可用');
+                if (!snapshot.hasData || snapshot.data!.location.isEmpty) {
+                  return Container(
+                    margin: const EdgeInsets.only(top: 32.0),
+                    alignment: Alignment.topCenter,
+                    child: const Text('暂无数据'),
+                  );
                 }
 
                 LocationData? data = snapshot.data;
@@ -175,7 +182,7 @@ class _CityLocationPageState extends State<CityLocationPage> {
                               '${location.adm1}'
                               '${location.adm2}';
 
-                          Navigator.of(context).pushReplacementNamed(
+                          Navigator.of(context).popAndPushNamed(
                             '/weather_page',
                             arguments: {
                               'longitude': longitude,
@@ -194,7 +201,9 @@ class _CityLocationPageState extends State<CityLocationPage> {
                             child: Container(
                               padding: const EdgeInsets.all(12.0),
                               child: Text(
-                                data.location[index].name,
+                                '${data.location[index].name}·'
+                                '${data.location[index].adm1}·'
+                                '${data.location[index].country}',
                                 style: const TextStyle(fontSize: 18.0),
                               ),
                             ),
@@ -234,7 +243,7 @@ class _CityLocationPageState extends State<CityLocationPage> {
 
                       await FirstTimeChecker.setNotFirstTime();
 
-                      navigator.pushReplacementNamed(
+                      navigator.popAndPushNamed(
                         '/weather_page',
                         arguments: {
                           'longitude': _locationResult.longitude,
@@ -424,16 +433,40 @@ class CityCard extends StatelessWidget {
                   final navigator = Navigator.of(context);
 
                   await _fetchLocationData(index: index).then(
-                    (LocationData value) => {
-                      longitude = double.parse(value.location[0].lon),
-                      latitude = double.parse(value.location[0].lat),
-                      address = '${value.location[0].country}'
-                          '${value.location[0].adm1}'
-                          '${value.location[0].adm2}'
+                    (LocationData value) {
+                      longitude = double.parse(value.location[0].lon);
+                      latitude = double.parse(value.location[0].lat);
+                      Location location = value.location[0];
+
+                      switch (data[index]) {
+                        case '巴塞罗那':
+                        case '首尔':
+                        case '新加坡':
+                        case '巴黎':
+                        case '芝加哥':
+                          address = '${value.location[1].country}'
+                              '${value.location[1].adm1}'
+                              '${value.location[1].adm2}';
+                          return;
+                        case '堪培拉':
+                          address = '${value.location[2].country}'
+                              '${value.location[2].adm1}'
+                              '${value.location[2].adm2}';
+                          return;
+                        case '伦敦':
+                          address = '${value.location[3].country}'
+                              '${value.location[3].adm1}'
+                              '${value.location[3].name}';
+                          return;
+                        default:
+                          address = '${location.country}'
+                              '${location.adm1}'
+                              '${location.adm2}';
+                      }
                     },
                   );
 
-                  navigator.pushReplacementNamed(
+                  navigator.popAndPushNamed(
                     '/weather_page',
                     arguments: {
                       'longitude': longitude,

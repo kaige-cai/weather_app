@@ -18,8 +18,7 @@ class WeatherData {
     required this.refer,
   });
 
-  factory WeatherData.fromJson(Map<String, dynamic> json) =>
-      _$WeatherDataFromJson(json);
+  factory WeatherData.fromJson(Map<String, dynamic> json) => _$WeatherDataFromJson(json);
 
   Map<String, dynamic> toJson() => _$WeatherDataToJson(this);
 }
@@ -58,8 +57,7 @@ class NowData {
     required this.dew,
   });
 
-  factory NowData.fromJson(Map<String, dynamic> json) =>
-      _$NowDataFromJson(json);
+  factory NowData.fromJson(Map<String, dynamic> json) => _$NowDataFromJson(json);
 
   Map<String, dynamic> toJson() => _$NowDataToJson(this);
 }
