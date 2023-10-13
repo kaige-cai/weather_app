@@ -1,4 +1,4 @@
-import 'model/weather_data.dart';
+import 'model/weather_now_data.dart';
 
 final List<String> cities = [
   '上海',
@@ -65,7 +65,7 @@ class RiveFiles {
       'https://public.rive.app/community/runtime-files/1465-2853-sea-salt-ice-cream.riv';
 }
 
-List<String> generateWeatherInfo(WeatherData weatherData) {
+List<String> generateWeatherInfo(WeatherNowData weatherData) {
   return [
     '体感：${weatherData.now.feelsLike}°C',
     '湿度：${weatherData.now.humidity}%',

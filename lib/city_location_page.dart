@@ -222,7 +222,7 @@ class _CityLocationPageState extends State<CityLocationPage> {
                 children: [
                   TextButton(
                     onPressed: () async {
-                      final navigator = Navigator.of(context);
+                      final NavigatorState navigator = Navigator.of(context);
                       _locationAction();
                       _startLocation();
 
@@ -440,23 +440,10 @@ class CityCard extends StatelessWidget {
 
                       switch (data[index]) {
                         case '巴塞罗那':
-                        case '首尔':
-                        case '新加坡':
-                        case '巴黎':
-                        case '芝加哥':
+                        case '阿姆斯特丹':
                           address = '${value.location[1].country}'
                               '${value.location[1].adm1}'
                               '${value.location[1].adm2}';
-                          return;
-                        case '堪培拉':
-                          address = '${value.location[2].country}'
-                              '${value.location[2].adm1}'
-                              '${value.location[2].adm2}';
-                          return;
-                        case '伦敦':
-                          address = '${value.location[3].country}'
-                              '${value.location[3].adm1}'
-                              '${value.location[3].name}';
                           return;
                         default:
                           address = '${location.country}'

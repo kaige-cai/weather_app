@@ -1,16 +1,16 @@
 import 'package:json_annotation/json_annotation.dart';
 
-part 'daily_data.g.dart'; // 自动生成的文件
+part 'weather_daily3_data.g.dart'; // 自动生成的文件
 
 @JsonSerializable()
-class DailyWeatherData {
+class WeatherDaily3Data {
   final String code;
   final String updateTime;
   final String fxLink;
   final List<DailyForecast> daily;
   final DailyRefer refer;
 
-  DailyWeatherData({
+  WeatherDaily3Data({
     required this.code,
     required this.updateTime,
     required this.fxLink,
@@ -18,9 +18,10 @@ class DailyWeatherData {
     required this.refer,
   });
 
-  factory DailyWeatherData.fromJson(Map<String, dynamic> json) => _$DailyWeatherDataFromJson(json);
+  factory WeatherDaily3Data.fromJson(Map<String, dynamic> json) =>
+      _$WeatherDaily3DataFromJson(json);
 
-  Map<String, dynamic> toJson() => _$DailyWeatherDataToJson(this);
+  Map<String, dynamic> toJson() => _$WeatherDaily3DataToJson(this);
 }
 
 @JsonSerializable()

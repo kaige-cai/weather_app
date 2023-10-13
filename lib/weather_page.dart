@@ -13,11 +13,13 @@ import 'package:rive/rive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:weather_app/data.dart';
 import 'package:weather_app/model/air_quality_daily_data.dart';
+import 'package:weather_app/model/weather_hourly_data.dart';
 
 import './util.dart';
 import 'model/air_quality_now_data.dart';
-import 'model/daily_data.dart';
-import 'model/weather_data.dart';
+import 'model/weather_daily3_data.dart';
+import 'model/weather_month_data.dart';
+import 'model/weather_now_data.dart';
 
 class WeatherPage extends StatefulWidget {
   const WeatherPage({super.key});
@@ -51,6 +53,9 @@ class WeatherPageState extends State<WeatherPage> {
     _locPlugin.seriesLocationCallback(callback: (BaiduLocation result) {
       setState(() {
         _locationResult = result;
+        if (result.address!.isNotEmpty) {
+          _stopLocation();
+        }
       });
     });
   }
@@ -79,10 +84,11 @@ class WeatherPageState extends State<WeatherPage> {
   @override
   void dispose() {
     _bannerAd?.dispose();
+    _stopLocation();
     super.dispose();
   }
 
-  Future<WeatherData> _fetchWeatherData({
+  Future<WeatherNowData> _fetchNowWeatherData({
     required double longitude,
     required double latitude,
   }) async {
@@ -103,7 +109,7 @@ class WeatherPageState extends State<WeatherPage> {
 
       if (response.statusCode == 200) {
         Map<String, dynamic> data = response.data;
-        WeatherData weatherData = WeatherData.fromJson(data);
+        WeatherNowData weatherData = WeatherNowData.fromJson(data);
         return weatherData;
       } else {
         logger.e('请求失败：${response.statusCode}');
@@ -113,7 +119,7 @@ class WeatherPageState extends State<WeatherPage> {
     }
 
     // 如果出现错误或异常，返回一个默认的 WeatherData 对象
-    return WeatherData(
+    return WeatherNowData(
       code: '',
       updateTime: '',
       fxLink: '',
@@ -140,7 +146,7 @@ class WeatherPageState extends State<WeatherPage> {
     );
   }
 
-  Future<DailyWeatherData> _fetchDailyWeatherData({
+  Future<WeatherDaily3Data> _fetchDailyWeatherData({
     required double longitude,
     required double latitude,
   }) async {
@@ -161,7 +167,7 @@ class WeatherPageState extends State<WeatherPage> {
 
       if (response.statusCode == 200) {
         Map<String, dynamic> data = response.data;
-        DailyWeatherData weatherData = DailyWeatherData.fromJson(data);
+        WeatherDaily3Data weatherData = WeatherDaily3Data.fromJson(data);
         return weatherData;
       } else {
         logger.e('请求失败：${response.statusCode}');
@@ -171,12 +177,103 @@ class WeatherPageState extends State<WeatherPage> {
     }
 
     // 如果出现错误或异常，返回一个默认的 WeatherData 对象
-    return DailyWeatherData(
+    return WeatherDaily3Data(
       code: '',
       updateTime: '',
       fxLink: '',
       daily: <DailyForecast>[],
       refer: DailyRefer(
+        sources: [],
+        license: [],
+      ),
+    );
+  }
+
+  Future<WeatherMonthData> _fetchMonthWeatherData({
+    required double longitude,
+    required double latitude,
+  }) async {
+    if (longitude == 0.0 || latitude == 0.0) {
+      longitude = -74.18819;
+      latitude = 42.93869;
+    }
+
+    try {
+      Dio dio = Dio();
+
+      final Map<String, dynamic> queryParams = {
+        'location': '$longitude,$latitude',
+        'key': 'a008fc18ddda40558ce9df9f3a14508e',
+        'lang': 'zh',
+        'unit': 'm',
+      };
+
+      Response response = await dio.get(
+        'https://api.qweather.com/v7/weather/30d',
+        queryParameters: queryParams,
+      );
+
+      if (response.statusCode == 200) {
+        Map<String, dynamic> data = response.data;
+        WeatherMonthData weatherData = WeatherMonthData.fromJson(data);
+        return weatherData;
+      } else {
+        logger.e('请求失败：${response.statusCode}');
+      }
+    } catch (e, stackTrace) {
+      logger.e('请求发生异常: $e', error: e, stackTrace: stackTrace);
+    }
+
+    // 如果出现错误或异常，返回一个默认的 WeatherMonthData 对象
+    return WeatherMonthData(
+      code: '',
+      updateTime: '',
+      fxLink: '',
+      daily: <DailyWeather>[],
+      refer: MonthRefer(
+        sources: [],
+        license: [],
+      ),
+    );
+  }
+
+  Future<WeatherHourlyData> _fetchHourlyWeatherData({
+    required double longitude,
+    required double latitude,
+  }) async {
+    try {
+      Dio dio = Dio();
+
+      final Map<String, dynamic> queryParams = {
+        'location': '$longitude,$latitude',
+        'key': 'a008fc18ddda40558ce9df9f3a14508e',
+        'lang': 'zh',
+        'unit': 'm',
+      };
+
+      Response response = await dio.get(
+        'https://api.qweather.com/v7/grid-weather/24h',
+        queryParameters: queryParams,
+      );
+
+      if (response.statusCode == 200) {
+        Map<String, dynamic> data = response.data;
+        WeatherHourlyData weatherData = WeatherHourlyData.fromJson(data);
+        return weatherData;
+      } else {
+        logger.e('请求失败：${response.statusCode}');
+      }
+    } catch (e, stackTrace) {
+      logger.e('请求发生异常: $e', error: e, stackTrace: stackTrace);
+    }
+
+    // 如果出现错误或异常，返回一个默认的 WeatherHourlyData 对象
+    return WeatherHourlyData(
+      code: '',
+      updateTime: '',
+      fxLink: '',
+      hourly: <HourlyData>[],
+      refer: HourlyRefer(
         sources: [],
         license: [],
       ),
@@ -529,6 +626,29 @@ class WeatherPageState extends State<WeatherPage> {
     }
   }
 
+  void showLoadingDialog(BuildContext context) async {
+    final NavigatorState navigator = Navigator.of(context);
+
+    showDialog(
+      context: context,
+      barrierDismissible: true, // 允许点击外部关闭对话框
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0), // 调整此值以更改圆角半径
+          ),
+          title: const LoadingTextAnimation(), // 等待中...动画文本
+        );
+      },
+    );
+
+    // 模拟定位完成后，关闭对话框
+    await Future.delayed(const Duration(seconds: 2));
+    if (_locationResult.address != null) {
+      navigator.pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final Object? args = ModalRoute.of(context)?.settings.arguments;
@@ -545,10 +665,12 @@ class WeatherPageState extends State<WeatherPage> {
     return Scaffold(
       body: FutureBuilder<List<dynamic>>(
         future: Future.wait([
-          _fetchWeatherData(longitude: longitude, latitude: latitude),
+          _fetchNowWeatherData(longitude: longitude, latitude: latitude),
           _fetchDailyWeatherData(longitude: longitude, latitude: latitude),
           _fetchAirQualityDailyData(longitude: longitude, latitude: latitude),
           _fetchAirQualityNowData(longitude: longitude, latitude: latitude),
+          _fetchHourlyWeatherData(longitude: longitude, latitude: latitude),
+          _fetchMonthWeatherData(longitude: longitude, latitude: latitude),
         ]),
         builder: (BuildContext context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -562,20 +684,22 @@ class WeatherPageState extends State<WeatherPage> {
           } else if (snapshot.hasData) {
             List<dynamic>? results = snapshot.data;
 
-            WeatherData weatherData = results?[0];
-            DailyWeatherData dailyData = results?[1];
+            WeatherNowData weathernowData = results?[0];
+            WeatherDaily3Data dailyData = results?[1];
             AirQualityDaily airQualityDaily = results?[2];
             AirQuality airQuality = results?[3];
+            WeatherHourlyData hourlyData = results?[4];
+            WeatherMonthData monthData = results?[5];
 
-            String dateString = weatherData.updateTime.substring(
+            String dateString = weathernowData.updateTime.substring(
               0,
-              weatherData.updateTime.indexOf('+'),
+              weathernowData.updateTime.indexOf('+'),
             );
             DateTime dateTime = DateTime.parse(dateString);
             DateFormat dateFormat = DateFormat('y年MM月dd日 ah:mm ', 'zh_CN'); // 创建一个格式化器
             String formattedDate = dateFormat.format(dateTime); // 格式化日期时间
 
-            final List<String> weatherInfo = generateWeatherInfo(weatherData);
+            final List<String> weatherInfo = generateWeatherInfo(weathernowData);
 
             return Scaffold(
               appBar: AppBar(
@@ -601,6 +725,12 @@ class WeatherPageState extends State<WeatherPage> {
                   IconButton(
                     icon: const Icon(CupertinoIcons.location_solid),
                     onPressed: () async {
+                      setState(() {
+                        showLoadingDialog(context);
+                      });
+
+                      final NavigatorState navigator = Navigator.of(context);
+
                       _locationAction();
                       _startLocation();
 
@@ -609,9 +739,29 @@ class WeatherPageState extends State<WeatherPage> {
                         latitude = _locationResult.latitude ?? 0.0;
                         address = _locationResult.address ?? '正在定位...';
                         pois = _locationResult.pois?[1].name ?? '请重试...';
+
+                        if (pois.isNotEmpty && pois != '请重试...') {
+                          _stopLocation();
+                        }
                       });
 
-                      await _fetchWeatherData(longitude: longitude, latitude: latitude);
+                      if (_locationResult.address != null) {
+                        await _fetchNowWeatherData(longitude: longitude, latitude: latitude);
+                        await _fetchDailyWeatherData(longitude: longitude, latitude: latitude);
+                        await _fetchAirQualityDailyData(longitude: longitude, latitude: latitude);
+                        await _fetchAirQualityNowData(longitude: longitude, latitude: latitude);
+                        await _fetchHourlyWeatherData(longitude: longitude, latitude: latitude);
+                        await _fetchMonthWeatherData(longitude: longitude, latitude: latitude);
+                      }
+
+                      await navigator.pushReplacement(
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) {
+                            return const WeatherPage();
+                          },
+                          transitionDuration: const Duration(seconds: 0), // 设置过渡时间为0秒
+                        ),
+                      );
 
                       if (_locationResult.address != null) {
                         _stopLocation();
@@ -625,10 +775,12 @@ class WeatherPageState extends State<WeatherPage> {
               body: RefreshIndicator(
                 onRefresh: () async {
                   setState(() {
-                    _fetchWeatherData(longitude: longitude, latitude: latitude);
+                    _fetchNowWeatherData(longitude: longitude, latitude: latitude);
                     _fetchDailyWeatherData(longitude: longitude, latitude: latitude);
                     _fetchAirQualityDailyData(longitude: longitude, latitude: latitude);
                     _fetchAirQualityNowData(longitude: longitude, latitude: latitude);
+                    _fetchHourlyWeatherData(longitude: longitude, latitude: latitude);
+                    _fetchMonthWeatherData(longitude: longitude, latitude: latitude);
                   });
                 },
                 child: NotificationListener<OverscrollIndicatorNotification>(
@@ -647,14 +799,14 @@ class WeatherPageState extends State<WeatherPage> {
                         ),
                       ),
                       _weatherRiveAnimation(
-                        status: weatherData.now.text,
-                        iconCode: weatherData.now.icon,
+                        status: weathernowData.now.text,
+                        iconCode: weathernowData.now.icon,
                       ),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           Text(
-                            '${weatherData.now.temp}°C',
+                            '${weathernowData.now.temp}°C',
                             style: const TextStyle(
                               fontSize: 115.0,
                               fontWeight: FontWeight.w200,
@@ -664,9 +816,9 @@ class WeatherPageState extends State<WeatherPage> {
                             width: 180.0,
                             child: Center(
                               child: Text(
-                                weatherData.now.text,
+                                weathernowData.now.text,
                                 style: TextStyle(
-                                  fontSize: weatherData.now.text.length <= 2 ? 100.0 : 50.0,
+                                  fontSize: weathernowData.now.text.length <= 2 ? 100.0 : 50.0,
                                   fontWeight: FontWeight.w100,
                                 ),
                               ),
@@ -723,8 +875,9 @@ class WeatherPageState extends State<WeatherPage> {
                       ),
                       Container(
                         margin: const EdgeInsets.symmetric(horizontal: 8.0),
-                        height: 180.0,
+                        height: 120.0,
                         child: GridView.builder(
+                          physics: const BouncingScrollPhysics(),
                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 3,
                             childAspectRatio: 1.35,
@@ -763,6 +916,51 @@ class WeatherPageState extends State<WeatherPage> {
                           },
                         ),
                       ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              '24小时预报',
+                              style: TextStyle(fontSize: 30.0),
+                            ),
+                            const SizedBox(width: 100.0),
+                            Row(
+                              children: [
+                                const Icon(CupertinoIcons.sunrise, size: 15.0),
+                                const SizedBox(width: 4.0),
+                                Text(
+                                  '${monthData.daily[0].sunrise} ',
+                                  style: const TextStyle(height: 1.8),
+                                ),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                const Icon(CupertinoIcons.sunset, size: 15.0),
+                                const SizedBox(width: 4.0),
+                                Text(
+                                  monthData.daily[0].sunset,
+                                  style: const TextStyle(height: 1.8),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      HourlyChart(data: hourlyData.hourly),
+                      const Row(
+                        children: [
+                          SizedBox(width: 16.0),
+                          Text(
+                            '30日预报',
+                            style: TextStyle(fontSize: 30.0),
+                          ),
+                        ],
+                      ),
+                      MonthChart(data: monthData.daily),
+                      const SizedBox(height: 120.0),
                       if (_bannerAd != null)
                         Align(
                           alignment: Alignment.bottomCenter,
@@ -892,9 +1090,11 @@ class DailyForecastCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8.0),
                 child: Container(
                   width: 40.0,
+                  height: 18.0,
                   color: getAqiColor(int.parse(aqi)),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       SizedBox(
                         width: lv.length <= 2 ? 10.0 : 20.0,
@@ -908,7 +1108,11 @@ class DailyForecastCard extends StatelessWidget {
                       ),
                       Text(
                         aqi,
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: lv.length <= 3 ? 12.0 : 10.0,
+                          height: 1.3,
+                        ),
                       ),
                     ],
                   ),
@@ -962,4 +1166,179 @@ Color getAqiColor(aqi) {
                       ? Colors.purple
                       : const Color.fromARGB(255, 105, 0, 26);
   return color;
+}
+
+class HourlyChart extends StatelessWidget {
+  const HourlyChart({super.key, required this.data});
+
+  final List<HourlyData> data;
+
+  String extractHour(String dateTimeString) {
+    // 使用正则表达式匹配时间部分（hh:mm）
+    final regExp = RegExp(r'(\d{2}:\d{2})');
+    final match = regExp.firstMatch(dateTimeString);
+
+    // 如果找到匹配项，返回匹配到的时间部分
+    if (match != null) {
+      return match.group(0)!; // 使用 ! 来断言匹配到的值非空
+    } else {
+      return ''; // 如果没有匹配项，返回空字符串或其他默认值
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 获取当前时间
+    DateTime currentTime = DateTime.now();
+    int currentIndex = 0;
+
+    // 找到当前时间对应的 HourlyData
+    for (int i = 0; i < data.length; i++) {
+      DateTime entryTime = DateTime.parse(data[i].fxTime);
+      if (entryTime.isAfter(currentTime)) {
+        currentIndex = i;
+        break;
+      }
+    }
+
+    ScrollController scrollController = ScrollController(initialScrollOffset: currentIndex * 60.0);
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      controller: scrollController,
+      child: Row(
+        children: data.asMap().entries.map(
+          (MapEntry<int, HourlyData> entry) {
+            return Column(
+              children: [
+                Container(
+                  width: 60.0,
+                  padding: const EdgeInsets.all(8.0),
+                  margin: const EdgeInsets.only(top: 8.0),
+                  child: Column(
+                    children: [
+                      Text('${entry.value.temp}°C'),
+                      Text(entry.value.text),
+                      Text(
+                        entry.value.windDir,
+                        style: const TextStyle(fontSize: 8.0),
+                      ),
+                      Text('${entry.value.windScale}级'),
+                      Text(extractHour(entry.value.fxTime)),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ).toList(),
+      ),
+    );
+  }
+}
+
+class MonthChart extends StatelessWidget {
+  const MonthChart({super.key, required this.data});
+
+  final List<DailyWeather> data;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: data.asMap().entries.map(
+          (MapEntry<int, DailyWeather> entry) {
+            return Column(
+              children: [
+                Container(
+                  width: 120.0,
+                  padding: const EdgeInsets.all(8),
+                  margin: const EdgeInsets.only(top: 8),
+                  child: Column(
+                    children: [
+                      Text('${entry.value.tempMin}~${entry.value.tempMax}°C'),
+                      Row(
+                        children: [
+                          const SizedBox(width: 32.0),
+                          Icon(Icons.sunny, size: 12.0, color: Colors.yellow.shade500),
+                          Text(
+                            entry.value.textDay,
+                            style: const TextStyle(fontSize: 12.0),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          const SizedBox(width: 32.0),
+                          Icon(Icons.nightlight, size: 12.0, color: Colors.yellow.shade500),
+                          Text(
+                            entry.value.textNight,
+                            style: const TextStyle(fontSize: 12.0),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        entry.value.windDirDay,
+                        style: const TextStyle(fontSize: 8.0),
+                      ),
+                      Text('${entry.value.windScaleDay}级'),
+                      Text(entry.value.fxDate),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ).toList(),
+      ),
+    );
+  }
+}
+
+class LoadingTextAnimation extends StatefulWidget {
+  const LoadingTextAnimation({super.key});
+
+  @override
+  LoadingTextAnimationState createState() => LoadingTextAnimationState();
+}
+
+class LoadingTextAnimationState extends State<LoadingTextAnimation> {
+  String loadingText = '';
+
+  @override
+  void initState() {
+    super.initState();
+    startLoadingAnimation();
+  }
+
+  startLoadingAnimation() async {
+    while (true) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      setState(() {
+        if (loadingText == '') {
+          loadingText = '.';
+        } else if (loadingText == '.') {
+          loadingText = '..';
+        } else if (loadingText == '..') {
+          loadingText = '...';
+        } else {
+          loadingText = '';
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      '正在定位中$loadingText',
+      style: const TextStyle(fontSize: 16.0),
+    );
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
 }

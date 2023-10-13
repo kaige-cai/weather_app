@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -10,8 +11,11 @@ import 'first_time_checker.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MobileAds.instance.initialize();
+  await EasyLocalization.ensureInitialized();
 
   final isFirstTime = await FirstTimeChecker.isFirstTime();
+
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   initializeDateFormatting('zh_CN', null).then((_) {
     runApp(WeatherApp(isFirstTime: isFirstTime));

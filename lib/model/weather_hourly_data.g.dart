@@ -1,32 +1,32 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'weather_data.dart';
+part of 'weather_hourly_data.dart';
 
 // **************************************************************************
 // JsonSerializableGenerator
 // **************************************************************************
 
-WeatherData _$WeatherDataFromJson(Map<String, dynamic> json) => WeatherData(
+WeatherHourlyData _$WeatherHourlyDataFromJson(Map<String, dynamic> json) => WeatherHourlyData(
       code: json['code'] as String,
       updateTime: json['updateTime'] as String,
       fxLink: json['fxLink'] as String,
-      now: NowData.fromJson(json['now'] as Map<String, dynamic>),
-      refer: Refer.fromJson(json['refer'] as Map<String, dynamic>),
+      hourly: (json['hourly'] as List<dynamic>)
+          .map((e) => HourlyData.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      refer: HourlyRefer.fromJson(json['refer'] as Map<String, dynamic>),
     );
 
-Map<String, dynamic> _$WeatherDataToJson(WeatherData instance) =>
-    <String, dynamic>{
+Map<String, dynamic> _$WeatherHourlyDataToJson(WeatherHourlyData instance) => <String, dynamic>{
       'code': instance.code,
       'updateTime': instance.updateTime,
       'fxLink': instance.fxLink,
-      'now': instance.now,
+      'hourly': instance.hourly,
       'refer': instance.refer,
     };
 
-NowData _$NowDataFromJson(Map<String, dynamic> json) => NowData(
-      obsTime: json['obsTime'] as String,
+HourlyData _$HourlyDataFromJson(Map<String, dynamic> json) => HourlyData(
+      fxTime: json['fxTime'] as String,
       temp: json['temp'] as String,
-      feelsLike: json['feelsLike'] as String,
       icon: json['icon'] as String,
       text: json['text'] as String,
       wind360: json['wind360'] as String,
@@ -40,10 +40,9 @@ NowData _$NowDataFromJson(Map<String, dynamic> json) => NowData(
       dew: json['dew'] as String,
     );
 
-Map<String, dynamic> _$NowDataToJson(NowData instance) => <String, dynamic>{
-      'obsTime': instance.obsTime,
+Map<String, dynamic> _$HourlyDataToJson(HourlyData instance) => <String, dynamic>{
+      'fxTime': instance.fxTime,
       'temp': instance.temp,
-      'feelsLike': instance.feelsLike,
       'icon': instance.icon,
       'text': instance.text,
       'wind360': instance.wind360,
@@ -57,14 +56,12 @@ Map<String, dynamic> _$NowDataToJson(NowData instance) => <String, dynamic>{
       'dew': instance.dew,
     };
 
-Refer _$ReferFromJson(Map<String, dynamic> json) => Refer(
-      sources:
-          (json['sources'] as List<dynamic>).map((e) => e as String).toList(),
-      license:
-          (json['license'] as List<dynamic>).map((e) => e as String).toList(),
+HourlyRefer _$HourlyReferFromJson(Map<String, dynamic> json) => HourlyRefer(
+      sources: (json['sources'] as List<dynamic>).map((e) => e as String).toList(),
+      license: (json['license'] as List<dynamic>).map((e) => e as String).toList(),
     );
 
-Map<String, dynamic> _$ReferToJson(Refer instance) => <String, dynamic>{
+Map<String, dynamic> _$HourlyReferToJson(HourlyRefer instance) => <String, dynamic>{
       'sources': instance.sources,
       'license': instance.license,
     };

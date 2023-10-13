@@ -1,12 +1,12 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'daily_data.dart';
+part of 'weather_daily3_data.dart';
 
 // **************************************************************************
 // JsonSerializableGenerator
 // **************************************************************************
 
-DailyWeatherData _$DailyWeatherDataFromJson(Map<String, dynamic> json) => DailyWeatherData(
+WeatherDaily3Data _$WeatherDaily3DataFromJson(Map<String, dynamic> json) => WeatherDaily3Data(
       code: json['code'] as String,
       updateTime: json['updateTime'] as String,
       fxLink: json['fxLink'] as String,
@@ -16,7 +16,7 @@ DailyWeatherData _$DailyWeatherDataFromJson(Map<String, dynamic> json) => DailyW
       refer: DailyRefer.fromJson(json['refer'] as Map<String, dynamic>),
     );
 
-Map<String, dynamic> _$DailyWeatherDataToJson(DailyWeatherData instance) => <String, dynamic>{
+Map<String, dynamic> _$WeatherDaily3DataToJson(WeatherDaily3Data instance) => <String, dynamic>{
       'code': instance.code,
       'updateTime': instance.updateTime,
       'fxLink': instance.fxLink,

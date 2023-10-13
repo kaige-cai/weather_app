@@ -1,16 +1,16 @@
 import 'package:json_annotation/json_annotation.dart';
 
-part 'weather_data.g.dart'; // 生成的字段映射代码将保存在该文件中
+part 'weather_now_data.g.dart'; // 生成的字段映射代码将保存在该文件中
 
 @JsonSerializable()
-class WeatherData {
+class WeatherNowData {
   final String code;
   final String updateTime;
   final String fxLink;
   final NowData now;
   final Refer refer;
 
-  WeatherData({
+  WeatherNowData({
     required this.code,
     required this.updateTime,
     required this.fxLink,
@@ -18,9 +18,9 @@ class WeatherData {
     required this.refer,
   });
 
-  factory WeatherData.fromJson(Map<String, dynamic> json) => _$WeatherDataFromJson(json);
+  factory WeatherNowData.fromJson(Map<String, dynamic> json) => _$WeatherNowDataFromJson(json);
 
-  Map<String, dynamic> toJson() => _$WeatherDataToJson(this);
+  Map<String, dynamic> toJson() => _$WeatherNowDataToJson(this);
 }
 
 @JsonSerializable()
